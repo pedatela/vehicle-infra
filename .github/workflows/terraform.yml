@@ -1,0 +1,142 @@
+name: Terraform Infra
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      apply_on_dispatch:
+        description: "Executa terraform apply mesmo fora de pushes no main"
+        required: false
+        default: "false"
+      destroy:
+        description: "Quando true, executa terraform destroy em vez de plan/apply"
+        required: false
+        default: "false"
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.destroy != 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_STATE_KEY: ${{ secrets.TF_STATE_KEY }}
+      TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+      TF_BACKEND_REGION: ${{ secrets.TF_BACKEND_REGION || vars.AWS_REGION || 'us-east-1' }}
+      TF_BACKEND_DYNAMO_TABLE: ${{ secrets.TF_BACKEND_DYNAMO_TABLE }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: |
+          set -euo pipefail
+          BACKEND_KEY="${TF_STATE_KEY:-postech-car/terraform.tfstate}"
+          BACKEND_REGION="${TF_BACKEND_REGION:-$AWS_REGION}"
+          CMD=(
+            terraform init
+            -backend-config="bucket=${TF_BACKEND_BUCKET}"
+            -backend-config="key=${BACKEND_KEY}"
+            -backend-config="region=${BACKEND_REGION}"
+          )
+          if [ -n "${TF_BACKEND_DYNAMO_TABLE:-}" ]; then
+            CMD+=("-backend-config=dynamodb_table=${TF_BACKEND_DYNAMO_TABLE}")
+          fi
+          "${CMD[@]}"
+
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Save plan output
+        if: ${{ github.event_name == 'pull_request' }}
+        run: terraform show -no-color tfplan > plan.txt
+
+      - name: Upload plan artifact
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: terraform/plan.txt
+
+      - name: Terraform Apply
+        if: |
+          github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+          github.event_name == 'workflow_dispatch' && github.event.inputs.apply_on_dispatch == 'true'
+        run: terraform apply -input=false -auto-approve tfplan
+
+  terraform_destroy:
+    name: Terraform Destroy
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_STATE_KEY: ${{ secrets.TF_STATE_KEY }}
+      TF_BACKEND_BUCKET: ${{ secrets.TF_BACKEND_BUCKET }}
+      TF_BACKEND_REGION: ${{ secrets.TF_BACKEND_REGION || vars.AWS_REGION || 'us-east-1' }}
+      TF_BACKEND_DYNAMO_TABLE: ${{ secrets.TF_BACKEND_DYNAMO_TABLE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: |
+          set -euo pipefail
+          BACKEND_KEY="${TF_STATE_KEY:-postech-car/terraform.tfstate}"
+          BACKEND_REGION="${TF_BACKEND_REGION:-$AWS_REGION}"
+          CMD=(
+            terraform init
+            -backend-config="bucket=${TF_BACKEND_BUCKET}"
+            -backend-config="key=${BACKEND_KEY}"
+            -backend-config="region=${BACKEND_REGION}"
+          )
+          if [ -n "${TF_BACKEND_DYNAMO_TABLE:-}" ]; then
+            CMD+=("-backend-config=dynamodb_table=${TF_BACKEND_DYNAMO_TABLE}")
+          fi
+          "${CMD[@]}"
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -input=false
