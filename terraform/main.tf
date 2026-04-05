@@ -266,7 +266,6 @@ resource "aws_ecs_service" "service" {
   task_definition = aws_ecs_task_definition.service[each.key].arn
   desired_count   = each.value.desired_count
   launch_type     = "FARGATE"
-  depends_on      = [aws_lb_listener.service[each.key]]
 
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
