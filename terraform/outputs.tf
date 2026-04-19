@@ -47,3 +47,9 @@ output "cognito_domain" {
   value       = aws_cognito_user_pool_domain.this.domain
   description = "Subdomínio público do Cognito Hosted UI"
 }
+
+output "sales_internal_sync_token" {
+  value       = local.sales_sync_token
+  description = "Token interno compartilhado entre Core e Sales"
+  sensitive   = true
+}

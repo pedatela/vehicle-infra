@@ -252,7 +252,9 @@ resource "aws_ecs_task_definition" "service" {
         ]
         : [
           { name = "PORT", value = tostring(var.sales_app_container_port) },
-          { name = "INTERNAL_SYNC_TOKEN", value = local.sales_sync_token }
+          { name = "INTERNAL_SYNC_TOKEN", value = local.sales_sync_token },
+          { name = "CORE_SERVICE_URL", value = "http://${aws_lb.service["core"].dns_name}/api" },
+          { name = "CORE_SERVICE_TOKEN", value = local.sales_sync_token }
         ]
       )
     }
