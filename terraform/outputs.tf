@@ -49,6 +49,6 @@ output "cognito_domain" {
 }
 
 output "sales_internal_sync_token" {
-  value       = local.sales_sync_token
+  value       = nonsensitive(local.sales_sync_token)
   description = "Token interno compartilhado entre Core e Sales"
 }
