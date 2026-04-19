@@ -43,7 +43,7 @@ variable "sales_app_container_port" {
 variable "sales_app_desired_count" {
   description = "Número de tasks ECS para o Sales"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "cognito_callback_urls" {
