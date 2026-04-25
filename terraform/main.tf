@@ -370,7 +370,7 @@ resource "aws_ecs_task_definition" "service" {
           { name = "DATABASE_NAME", value = local.rds_db_names[each.key] },
           { name = "DATABASE_USER", value = var.rds_username },
           { name = "DATABASE_PASSWORD", value = local.rds_passwords[each.key] },
-          { name = "DATABASE_SSL", value = "false" }
+          { name = "DATABASE_SSL", value = "true" }
         ]
         : [
           { name = "PORT", value = tostring(var.sales_app_container_port) },
@@ -382,7 +382,7 @@ resource "aws_ecs_task_definition" "service" {
           { name = "DATABASE_NAME", value = local.rds_db_names[each.key] },
           { name = "DATABASE_USER", value = var.rds_username },
           { name = "DATABASE_PASSWORD", value = local.rds_passwords[each.key] },
-          { name = "DATABASE_SSL", value = "false" }
+          { name = "DATABASE_SSL", value = "true" }
         ]
       )
     }
