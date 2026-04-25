@@ -288,9 +288,13 @@ locals {
 }
 
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-rds-subnets"
+  name       = "${var.project_name}-rds-subnets-${var.rds_publicly_accessible ? "public" : "private"}"
   subnet_ids = local.rds_subnet_ids
   tags       = local.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_db_instance" "service" {
