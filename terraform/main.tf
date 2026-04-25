@@ -319,6 +319,11 @@ resource "aws_db_instance" "service" {
   apply_immediately            = true
   performance_insights_enabled = false
   tags                         = merge(local.tags, { Service = each.key })
+
+  lifecycle {
+    create_before_destroy = true
+    replace_triggered_by  = [aws_db_subnet_group.main]
+  }
 }
 
 resource "aws_ecs_task_definition" "service" {
