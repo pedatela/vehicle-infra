@@ -374,6 +374,10 @@ resource "aws_ecs_task_definition" "service" {
         ]
         : [
           { name = "PORT", value = tostring(var.sales_app_container_port) },
+          { name = "COGNITO_REGION", value = var.aws_region },
+          { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.this.id },
+          { name = "COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.this.id },
+          { name = "COGNITO_ISSUER", value = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.this.id}" },
           { name = "INTERNAL_SYNC_TOKEN", value = local.sales_sync_token },
           { name = "CORE_SERVICE_URL", value = "http://${aws_lb.service["core"].dns_name}/api" },
           { name = "CORE_SERVICE_TOKEN", value = local.sales_sync_token },
