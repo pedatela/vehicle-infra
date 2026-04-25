@@ -1,5 +1,6 @@
 locals {
-  tags = { Project = var.project_name }
+  tags            = { Project = var.project_name }
+  rds_mode_suffix = var.rds_publicly_accessible ? "pub" : "priv"
   rds_subnet_ids = (
     var.rds_publicly_accessible
     ? values(aws_subnet.public)[*].id
@@ -299,7 +300,7 @@ resource "aws_db_subnet_group" "main" {
 
 resource "aws_db_instance" "service" {
   for_each                     = local.services
-  identifier                   = "${var.project_name}-${each.key}-postgres"
+  identifier                   = "${var.project_name}-${each.key}-postgres-${local.rds_mode_suffix}"
   allocated_storage            = var.rds_allocated_storage
   max_allocated_storage        = var.rds_max_allocated_storage
   engine                       = "postgres"
