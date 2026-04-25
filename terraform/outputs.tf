@@ -52,3 +52,29 @@ output "sales_internal_sync_token" {
   value       = nonsensitive(local.sales_sync_token)
   description = "Token interno compartilhado entre Core e Sales"
 }
+
+output "rds_endpoints" {
+  value       = { for name, db in aws_db_instance.service : name => db.address }
+  description = "Endpoints PostgreSQL RDS por serviço"
+}
+
+output "rds_ports" {
+  value       = { for name, db in aws_db_instance.service : name => db.port }
+  description = "Portas PostgreSQL RDS por serviço"
+}
+
+output "rds_db_names" {
+  value       = local.rds_db_names
+  description = "Nomes de banco PostgreSQL por serviço"
+}
+
+output "rds_usernames" {
+  value       = { for name in keys(local.services) : name => var.rds_username }
+  description = "Usuários master PostgreSQL por serviço"
+}
+
+output "rds_passwords" {
+  value       = local.rds_passwords
+  description = "Senhas master PostgreSQL por serviço"
+  sensitive   = true
+}

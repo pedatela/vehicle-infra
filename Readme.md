@@ -1,10 +1,11 @@
-### Terraform para Core + Sales + Cognito
+### Terraform para Core + Sales + Cognito + RDS
 
 O diretório `terraform/` provisiona toda a infraestrutura necessária para os **dois serviços** (Core e Sales) e para o mecanismo de autenticação via Amazon Cognito:
 
 - VPC dedicada com sub-redes públicas, IGW, rotas e security groups.
 - Dois repositórios ECR, duas definições ECS Fargate e dois Application Load Balancers (um por serviço), respeitando o isolamento pedido.
 - Cognito User Pool + App Client + domínio público para o fluxo OAuth/JWT consumido pelo Core.
+- Dois RDS PostgreSQL (um para Core e outro para Sales) em sub-redes privadas, com Security Group dedicado e variáveis de conexão injetadas nas tasks ECS.
 
 Para usar localmente:
 
@@ -28,8 +29,13 @@ Variáveis úteis:
 - `core_app_desired_count` / `sales_app_desired_count`: quantidade de tasks Fargate (permitindo escalar o Sales independentemente).
 - `sales_internal_sync_token`: token compartilhado entre Core e Sales (se vazio, o Terraform gera e injeta nas tasks).
 - `cognito_callback_urls` / `cognito_logout_urls`: listas de URLs autorizadas no User Pool Client.
+- `rds_instance_class`: classe da instância RDS (padrão menor para teste: `db.t4g.micro`).
+- `rds_allocated_storage` / `rds_max_allocated_storage`: disco inicial e máximo.
+- `rds_db_name` / `rds_username` / `rds_password`: prefixo e credenciais dos bancos (Core e Sales recebem bancos separados).
+- `rds_multi_az`: ativa Multi-AZ para alta disponibilidade.
+- `rds_backup_retention_period`: retenção de backups automáticos (padrão `0` para teste/custo mínimo).
 
-> Os outputs retornam os DNS dos ALBs (Core e Sales), nomes dos serviços ECS, URLs dos ECRs e os identificadores do Cognito (User Pool, Client e domínio).
+> Os outputs retornam os DNS dos ALBs (Core e Sales), nomes dos serviços ECS, URLs dos ECRs, identificadores do Cognito e endpoints/credenciais dos RDS por serviço.
 
 ### Deploy automatizado com GitHub Actions
 

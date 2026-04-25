@@ -69,6 +69,29 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+resource "aws_subnet" "private" {
+  for_each = {
+    a = "10.0.11.0/24"
+    b = "10.0.12.0/24"
+  }
+
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = each.value
+  availability_zone = "${var.aws_region}${each.key}"
+  tags              = merge(local.tags, { Name = "private-${each.key}" })
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+  tags   = merge(local.tags, { Name = "private" })
+}
+
+resource "aws_route_table_association" "private" {
+  for_each       = aws_subnet.private
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.private.id
+}
+
 resource "aws_security_group" "alb" {
   for_each    = local.services
   name        = "${var.project_name}-${each.key}-alb"
@@ -113,6 +136,28 @@ resource "aws_security_group" "service" {
   }
 
   tags = merge(local.tags, { Service = each.key })
+}
+
+resource "aws_security_group" "rds" {
+  name        = "${var.project_name}-rds"
+  description = "Acesso PostgreSQL para ECS"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    protocol        = "tcp"
+    from_port       = 5432
+    to_port         = 5432
+    security_groups = [for sg in aws_security_group.service : sg.id]
+  }
+
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = local.tags
 }
 
 resource "aws_lb" "service" {
@@ -206,8 +251,53 @@ resource "random_password" "sales_sync_token" {
   special = false
 }
 
+resource "random_password" "rds" {
+  for_each = local.services
+  length   = 24
+  upper    = true
+  numeric  = true
+  special  = false
+}
+
 locals {
   sales_sync_token = var.sales_internal_sync_token != "" ? var.sales_internal_sync_token : random_password.sales_sync_token.result
+  rds_passwords = {
+    for service_name in keys(local.services) :
+    service_name => (var.rds_password != "" ? var.rds_password : random_password.rds[service_name].result)
+  }
+  rds_db_names = {
+    for service_name in keys(local.services) :
+    service_name => lower(substr(replace("${var.rds_db_name}${service_name}", "-", ""), 0, 63))
+  }
+}
+
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-rds-subnets"
+  subnet_ids = values(aws_subnet.private)[*].id
+  tags       = local.tags
+}
+
+resource "aws_db_instance" "service" {
+  for_each                     = local.services
+  identifier                   = "${var.project_name}-${each.key}-postgres"
+  allocated_storage            = var.rds_allocated_storage
+  max_allocated_storage        = var.rds_max_allocated_storage
+  engine                       = "postgres"
+  instance_class               = var.rds_instance_class
+  db_name                      = local.rds_db_names[each.key]
+  username                     = var.rds_username
+  password                     = local.rds_passwords[each.key]
+  db_subnet_group_name         = aws_db_subnet_group.main.name
+  vpc_security_group_ids       = [aws_security_group.rds.id]
+  publicly_accessible          = false
+  multi_az                     = var.rds_multi_az
+  skip_final_snapshot          = var.rds_skip_final_snapshot
+  deletion_protection          = false
+  backup_retention_period      = var.rds_backup_retention_period
+  auto_minor_version_upgrade   = true
+  apply_immediately            = true
+  performance_insights_enabled = false
+  tags                         = merge(local.tags, { Service = each.key })
 }
 
 resource "aws_ecs_task_definition" "service" {
@@ -248,13 +338,25 @@ resource "aws_ecs_task_definition" "service" {
           { name = "COGNITO_ISSUER", value = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.this.id}" },
           { name = "AUTH_SELLER_ROLE", value = "seller" },
           { name = "SALES_SERVICE_URL", value = "http://${aws_lb.service["sales"].dns_name}/api" },
-          { name = "SALES_SERVICE_TOKEN", value = local.sales_sync_token }
+          { name = "SALES_SERVICE_TOKEN", value = local.sales_sync_token },
+          { name = "DATABASE_HOST", value = aws_db_instance.service[each.key].address },
+          { name = "DATABASE_PORT", value = tostring(aws_db_instance.service[each.key].port) },
+          { name = "DATABASE_NAME", value = local.rds_db_names[each.key] },
+          { name = "DATABASE_USER", value = var.rds_username },
+          { name = "DATABASE_PASSWORD", value = local.rds_passwords[each.key] },
+          { name = "DATABASE_SSL", value = "false" }
         ]
         : [
           { name = "PORT", value = tostring(var.sales_app_container_port) },
           { name = "INTERNAL_SYNC_TOKEN", value = local.sales_sync_token },
           { name = "CORE_SERVICE_URL", value = "http://${aws_lb.service["core"].dns_name}/api" },
-          { name = "CORE_SERVICE_TOKEN", value = local.sales_sync_token }
+          { name = "CORE_SERVICE_TOKEN", value = local.sales_sync_token },
+          { name = "DATABASE_HOST", value = aws_db_instance.service[each.key].address },
+          { name = "DATABASE_PORT", value = tostring(aws_db_instance.service[each.key].port) },
+          { name = "DATABASE_NAME", value = local.rds_db_names[each.key] },
+          { name = "DATABASE_USER", value = var.rds_username },
+          { name = "DATABASE_PASSWORD", value = local.rds_passwords[each.key] },
+          { name = "DATABASE_SSL", value = "false" }
         ]
       )
     }

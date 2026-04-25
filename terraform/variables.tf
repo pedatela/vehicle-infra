@@ -68,3 +68,58 @@ variable "sales_internal_sync_token" {
   default     = ""
   sensitive   = true
 }
+
+variable "rds_instance_class" {
+  description = "Classe da instância RDS PostgreSQL"
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "rds_allocated_storage" {
+  description = "Armazenamento inicial do RDS (GB)"
+  type        = number
+  default     = 20
+}
+
+variable "rds_max_allocated_storage" {
+  description = "Armazenamento máximo autoscaling do RDS (GB)"
+  type        = number
+  default     = 20
+}
+
+variable "rds_db_name" {
+  description = "Prefixo do nome do banco PostgreSQL (core/sales será concatenado)"
+  type        = string
+  default     = "postechapp"
+}
+
+variable "rds_username" {
+  description = "Usuário master do PostgreSQL"
+  type        = string
+  default     = "postechadmin"
+}
+
+variable "rds_password" {
+  description = "Senha do usuário master; deixe vazio para gerar automaticamente"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "rds_multi_az" {
+  description = "Habilita deployment Multi-AZ no RDS"
+  type        = bool
+  default     = false
+}
+
+variable "rds_backup_retention_period" {
+  description = "Dias de retenção de backup automático (0 desabilita)"
+  type        = number
+  default     = 0
+}
+
+variable "rds_skip_final_snapshot" {
+  description = "Pula snapshot final ao destruir o RDS"
+  type        = bool
+  default     = true
+}
