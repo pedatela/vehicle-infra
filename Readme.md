@@ -5,7 +5,7 @@ O diretório `terraform/` provisiona toda a infraestrutura necessária para os *
 - VPC dedicada com sub-redes públicas, IGW, rotas e security groups.
 - Dois repositórios ECR, duas definições ECS Fargate e dois Application Load Balancers (um por serviço), respeitando o isolamento pedido.
 - Cognito User Pool + App Client + domínio público para o fluxo OAuth/JWT consumido pelo Core.
-- Dois RDS PostgreSQL (um para Core e outro para Sales) em sub-redes privadas, com Security Group dedicado e variáveis de conexão injetadas nas tasks ECS.
+- Dois RDS PostgreSQL (um para Core e outro para Sales), com opção de acesso público para conexão externa (Postico) e variáveis de conexão injetadas nas tasks ECS.
 
 Para usar localmente:
 
@@ -34,6 +34,8 @@ Variáveis úteis:
 - `rds_db_name` / `rds_username` / `rds_password`: prefixo e credenciais dos bancos (Core e Sales recebem bancos separados).
 - `rds_multi_az`: ativa Multi-AZ para alta disponibilidade.
 - `rds_backup_retention_period`: retenção de backups automáticos (padrão `0` para teste/custo mínimo).
+- `rds_publicly_accessible`: habilita endpoint público para conexão externa direta.
+- `rds_allowed_cidrs`: lista de CIDRs liberados no Security Group do RDS (use seu IP em vez de `0.0.0.0/0` em ambientes reais).
 
 > Os outputs retornam os DNS dos ALBs (Core e Sales), nomes dos serviços ECS, URLs dos ECRs, identificadores do Cognito e endpoints/credenciais dos RDS por serviço.
 

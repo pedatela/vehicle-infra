@@ -1,5 +1,10 @@
 locals {
   tags = { Project = var.project_name }
+  rds_subnet_ids = (
+    var.rds_publicly_accessible
+    ? values(aws_subnet.public)[*].id
+    : values(aws_subnet.private)[*].id
+  )
   services = {
     core = {
       container_port = var.core_app_container_port
@@ -150,6 +155,17 @@ resource "aws_security_group" "rds" {
     security_groups = [for sg in aws_security_group.service : sg.id]
   }
 
+  dynamic "ingress" {
+    for_each = var.rds_publicly_accessible ? [1] : []
+
+    content {
+      protocol    = "tcp"
+      from_port   = 5432
+      to_port     = 5432
+      cidr_blocks = var.rds_allowed_cidrs
+    }
+  }
+
   egress {
     protocol    = "-1"
     from_port   = 0
@@ -273,7 +289,7 @@ locals {
 
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-rds-subnets"
-  subnet_ids = values(aws_subnet.private)[*].id
+  subnet_ids = local.rds_subnet_ids
   tags       = local.tags
 }
 
@@ -289,7 +305,7 @@ resource "aws_db_instance" "service" {
   password                     = local.rds_passwords[each.key]
   db_subnet_group_name         = aws_db_subnet_group.main.name
   vpc_security_group_ids       = [aws_security_group.rds.id]
-  publicly_accessible          = false
+  publicly_accessible          = var.rds_publicly_accessible
   multi_az                     = var.rds_multi_az
   skip_final_snapshot          = var.rds_skip_final_snapshot
   deletion_protection          = false

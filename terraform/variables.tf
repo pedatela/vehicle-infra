@@ -123,3 +123,15 @@ variable "rds_skip_final_snapshot" {
   type        = bool
   default     = true
 }
+
+variable "rds_publicly_accessible" {
+  description = "Define se o RDS será público para conexão direta externa"
+  type        = bool
+  default     = true
+}
+
+variable "rds_allowed_cidrs" {
+  description = "CIDRs liberados para acesso externo ao RDS quando público"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
